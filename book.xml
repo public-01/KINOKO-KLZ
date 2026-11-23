@@ -1,7 +1,7 @@
 <scaffold>
     <refresh onRefresh="onRefresh" loading="$loading">
         <slivers>
-            <sliver-appbar expandedHeight="288" color="white" floating="true" pinned="true">
+            <sliver-appbar expandedHeight="300" color="white" floating="true" pinned="true">
                 <FlexibleSpaceBar padding="ltrb(20,0,0,64)">
                     <attr:background>
                         <stack>
@@ -22,7 +22,7 @@
                             </view>
                         </stack>
                     </attr:background>
-                    <text lines="8" overflow="ellipsis">
+                    <text lines="12" overflow="ellipsis">
                         <span size="14">$title</span>
                         <span alignment="middle">
                             <button type="text"
@@ -37,9 +37,33 @@
                             <span><view padding="ltrb(0,5,0,0)"/></span>
                             <span size="8">$subtitle</span>
                         </if>
+                        <if candidate="isNotNull($otherName)">
+                            <span><view padding="ltrb(0,4,0,0)"/></span>
+                            <span size="8">其他名稱：$otherName</span>
+                        </if>
+                        <if candidate="isNotNull($status)">
+                            <span><view padding="ltrb(0,4,0,0)"/></span>
+                            <span size="8">狀態：$status</span>
+                        </if>
+                        <if candidate="isNotNull($genresText)">
+                            <span><view padding="ltrb(0,4,0,0)"/></span>
+                            <span size="8">類型：$genresText</span>
+                        </if>
                         <if candidate="isNotNull($summary)">
                             <span><view padding="ltrb(0,5,0,0)"/></span>
-                            <span size="8">$summary</span>
+                            <span size="8">
+                                <if candidate="$aiTranslated">
+                                    <span>AI 翻譯：</span>
+                                </if>
+                                <else>
+                                    <span>作品說明：</span>
+                                </else>
+                                <span>$summary</span>
+                            </span>
+                        </if>
+                        <if candidate="isNotNull($translationWarning)">
+                            <span><view padding="ltrb(0,4,0,0)"/></span>
+                            <span size="7">AI 翻譯未取得，暫時顯示原文：$translationWarning</span>
                         </if>
                     </text>
                 </FlexibleSpaceBar>
@@ -48,9 +72,7 @@
                         <if candidate="js(isFavarite)">
                             <icon color="red">favorite</icon>
                         </if>
-                        <else>
-                            <icon>favorite</icon>
-                        </else>
+                        <else><icon>favorite</icon></else>
                     </button>
                 </attr:actions>
                 <attr:bottom>
@@ -67,16 +89,12 @@
                                     </if>
                                 </expanded>
                                 <menu-button onSelected="onOrderSelected">
-                                    <attr:icon>
-                                        <icon color="color(primary)">sort</icon>
-                                    </attr:icon>
+                                    <attr:icon><icon color="color(primary)">sort</icon></attr:icon>
                                     <attr:items>
                                         <menu-item value="true">
                                             <text>
                                                 <view width="36">
-                                                    <if candidate="$reverse">
-                                                        <icon color="color(primary)">check</icon>
-                                                    </if>
+                                                    <if candidate="$reverse"><icon color="color(primary)">check</icon></if>
                                                 </view>
                                                 <span text="loc(reverse_order)"/>
                                             </text>
@@ -84,9 +102,7 @@
                                         <menu-item value="false">
                                             <text>
                                                 <view width="36">
-                                                    <if candidate="not($reverse)">
-                                                        <icon color="color(primary)">check</icon>
-                                                    </if>
+                                                    <if candidate="not($reverse)"><icon color="color(primary)">check</icon></if>
                                                 </view>
                                                 <span text="loc(order)"/>
                                             </text>
@@ -96,7 +112,7 @@
                                 <divider type="vertical"/>
                                 <switch axis="horizontal">
                                     <if candidate="$editing">
-                                        <button id="clear-button" padding="ltrb(8,13,8,8)" type="icon" color="color(primary)" onPressed="onClearPressed">
+                                        <button padding="ltrb(8,13,8,8)" type="icon" color="color(primary)" onPressed="onClearPressed">
                                             <icon>clear</icon>
                                         </button>
                                     </if>
@@ -104,7 +120,7 @@
                                 </switch>
                                 <switch axis="horizontal">
                                     <if candidate="$editing">
-                                        <button id="check-button" padding="ltrb(8,13,8,8)" type="icon" color="color(primary)" onPressed="onCheckPressed">
+                                        <button padding="ltrb(8,13,8,8)" type="icon" color="color(primary)" onPressed="onCheckPressed">
                                             <icon>check</icon>
                                         </button>
                                     </if>
@@ -112,7 +128,7 @@
                                 </switch>
                                 <switch axis="horizontal">
                                     <if candidate="not($editing)">
-                                        <button id="download-button" padding="ltrb(8,13,8,8)" type="icon" color="color(primary)" onPressed="onDownloadPressed">
+                                        <button padding="ltrb(8,13,8,8)" type="icon" color="color(primary)" onPressed="onDownloadPressed">
                                             <icon>file_download</icon>
                                         </button>
                                     </if>
@@ -134,13 +150,9 @@
                             <attr:onTap>
                                 <callback function="onPressed" args="array($index)"/>
                             </attr:onTap>
-                            <attr:title>
-                                <text>${item.title}</text>
-                            </attr:title>
+                            <attr:title><text>${item.title}</text></attr:title>
                             <if candidate="isNotNull(${item.subtitle})">
-                                <attr:subtitle>
-                                    <text>${item.subtitle}</text>
-                                </attr:subtitle>
+                                <attr:subtitle><text>${item.subtitle}</text></attr:subtitle>
                             </if>
                             <attr:trailing>
                                 <view width="26" height="26" alignment="center">
@@ -149,12 +161,8 @@
                                             <if candidate="js(isSelected, $index)">
                                                 <icon color='color("primary")'>radio_button_checked</icon>
                                             </if>
-                                            <else candidate="js(isDownloaded, $index)">
-                                                <icon>check</icon>
-                                            </else>
-                                            <else>
-                                                <icon>radio_button_unchecked</icon>
-                                            </else>
+                                            <else candidate="js(isDownloaded, $index)"><icon>check</icon></else>
+                                            <else><icon>radio_button_unchecked</icon></else>
                                         </if>
                                         <else><view/></else>
                                     </switch>

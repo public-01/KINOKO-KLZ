@@ -1,92 +1,152 @@
 const checkResponse = require('./http');
-const { decryptMangaCopyPayload } = require('./aes');
+const sha256 = require('./sha256');
 
-const BASE_URL = 'https://www.mangacopy.com/';
-const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
-const AES_KEY = '0p0zzpvv.nmn.oop';
+const BASE_URL = 'https://klz9.com/';
+const API_URL = `${BASE_URL}api/`;
+const TARGET_LANGUAGE = 'Traditional Chinese';
+const SIGNING_SALT = 'KL9K40zaSyC9K40vOMLLbEcepIFBhUKXwELqxlwTEF';
+const TRANSLATION_CACHE_PREFIX = 'klz9:ai-translation:';
+const TRANSLATION_USAGE_KEY = 'mangazen_guest_ai_translation_daily_v1';
+const DAILY_TRANSLATION_LIMIT = 3;
 
-function makeChapterUrl(slug, id) {
-    return new URL(`/comic/${slug}/chapter/${id}`, BASE_URL).toString();
-}
-
-function mapChapters(data, slug) {
-    const records = data.groups || {};
-    const keys = Object.keys(records);
-    keys.sort((a, b) => {
-        if (a === 'default') return -1;
-        if (b === 'default') return 1;
-        return 0;
-    });
-    const typeNames = { 1: '話', 2: '卷', 3: '番外' };
-    const items = [];
-    const seen = Object.create(null);
-    for (let groupIndex = keys.length - 1; groupIndex >= 0; groupIndex--) {
-        const key = keys[groupIndex];
-        const group = records[key];
-        const chapters = Array.isArray(group.chapters) ? group.chapters : [];
-        for (const chapter of chapters) {
-            const link = makeChapterUrl(slug, chapter.id);
-            if (!chapter.id || seen[link]) continue;
-            seen[link] = true;
-            const typeName = typeNames[Number(chapter.type)];
-            items.push({
-                title: chapter.name || '',
-                link: link,
-                subtitle: [group.name || (key === 'default' ? '默認' : key), typeName]
-                    .filter(value => value).join(' · ')
-            });
-        }
-    }
-    return items;
-}
-
-module.exports = async function(url) {
-    const res = await fetch(url, {
-        headers: {
-            'User-Agent': USER_AGENT,
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-        }
-    });
-    checkResponse(res, 'Could not load MangaCopy details', url);
-    const html = await res.text();
-    const doc = HTMLParser.parse(html);
-    const titleNode = doc.querySelector('.comicParticulars-title-right h6');
-    const authorNode = doc.querySelector('.comicParticulars-right-txt');
-    const summaryNode = doc.querySelector('.intro');
-    const dntNode = doc.querySelector('#dnt');
-    const slug = new URL(url).pathname.split('/').filter(Boolean).pop();
-    if (!slug) throw new Error('Could not identify the MangaCopy comic');
-    if (!dntNode || !dntNode.getAttribute('value')) throw new Error('MangaCopy chapter token was not found');
-
-    const endpoint = new URL(`/comicdetail/${slug}/chapters`, BASE_URL).toString();
-    const chapterResponse = await fetch(endpoint, {
-        headers: {
-            'User-Agent': USER_AGENT,
-            'Accept': 'application/json, text/javascript, */*; q=0.01',
-            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-            'Referer': url,
-            'Origin': 'https://www.mangacopy.com',
-            'dnts': dntNode.getAttribute('value')
-        }
-    });
-    checkResponse(chapterResponse, 'Could not load MangaCopy chapters', endpoint);
-    const responseText = await chapterResponse.text();
-    if (!responseText.trim()) throw new Error('MangaCopy chapter API returned an empty response');
-    const response = JSON.parse(responseText);
-    if (response.code !== 200 || typeof response.results !== 'string') {
-        throw new Error(response.message || 'Unexpected MangaCopy chapter response');
-    }
-    const chapterData = JSON.parse(decryptMangaCopyPayload(response.results, AES_KEY));
-    const build = chapterData.build || {};
-    const comicSlug = build.path_word || slug;
-    const list = mapChapters(chapterData, comicSlug);
-    if (list.length === 0) {
-        throw new Error('MangaCopy returned no chapter data for this comic');
-    }
+function getSignatureHeaders() {
+    const timestamp = Math.floor(new Date().getTime() / 1000).toString();
     return {
-        title: titleNode ? titleNode.text.trim() : '',
-        subtitle: authorNode ? authorNode.text.trim() : '',
-        summary: summaryNode ? summaryNode.text.trim() : '',
+        'Content-Type': 'application/json',
+        'x-client-ts': timestamp,
+        'x-client-sig': sha256(`${timestamp}.${SIGNING_SALT}`)
+    };
+}
+
+function getUsage() {
+    const saved = localStorage[TRANSLATION_USAGE_KEY];
+    if (!saved) return { count: 0, resetAt: new Date().getTime() + 24 * 60 * 60 * 1000 };
+    const usage = JSON.parse(saved);
+    if (!usage.resetAt || usage.resetAt <= new Date().getTime()) {
+        return { count: 0, resetAt: new Date().getTime() + 24 * 60 * 60 * 1000 };
+    }
+    return usage;
+}
+
+async function translateDescription(manga) {
+    const description = (manga.description || '').trim();
+    if (!description || description.toLowerCase() === 'updating') {
+        return { text: description, translated: false, error: '' };
+    }
+
+    const cacheKey = `${TRANSLATION_CACHE_PREFIX}${manga.id}:${TARGET_LANGUAGE}`;
+    const cached = localStorage[cacheKey];
+    if (cached) {
+        try {
+            const translation = JSON.parse(cached);
+            if (translation && translation.text) {
+                return { text: translation.text, translated: true, error: '' };
+            }
+        } catch (e) {
+            return { text: description, translated: false, error: `AI 翻譯快取讀取失敗：${e}` };
+        }
+    }
+
+    let usage;
+    try {
+        usage = getUsage();
+    } catch (e) {
+        return { text: description, translated: false, error: `AI 翻譯額度讀取失敗：${e}` };
+    }
+    if (usage.count >= DAILY_TRANSLATION_LIMIT) {
+        return {
+            text: description,
+            translated: false,
+            error: '今日 AI 翻譯額度已用完，暫時顯示原文。'
+        };
+    }
+    usage.count++;
+    localStorage[TRANSLATION_USAGE_KEY] = JSON.stringify(usage);
+
+    const url = `${API_URL}gemini/translate-manga`;
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: getSignatureHeaders(),
+            body: JSON.stringify({
+                title: manga.name || '',
+                description: description,
+                targetLang: TARGET_LANGUAGE
+            })
+        });
+        checkResponse(res, 'KLZ9 AI 翻譯失敗', url);
+        const text = await res.text();
+        if (!text.trim()) throw new Error('KLZ9 AI 翻譯回應為空');
+        const result = JSON.parse(text);
+        if (!result.translatedDescription) {
+            throw new Error('KLZ9 未提供翻譯後的作品說明');
+        }
+        localStorage[cacheKey] = JSON.stringify({
+            text: result.translatedDescription,
+            title: result.translatedTitle || ''
+        });
+        return { text: result.translatedDescription, translated: true, error: '' };
+    } catch (e) {
+        return { text: description, translated: false, error: `${e}` };
+    }
+}
+
+function mapChapters(manga) {
+    const chapters = Array.isArray(manga.chapters) ? manga.chapters : [];
+    return chapters.slice().reverse().map(chapter => {
+        const number = String(chapter.chapter);
+        return {
+            id: chapter.id,
+            chapter: chapter.chapter,
+            title: chapter.name || `Chapter ${number}`,
+            link: new URL(`/${manga.slug}-chapter-${encodeURIComponent(number)}.html`, BASE_URL).toString(),
+            subtitle: chapter.last_update ? chapter.last_update.slice(0, 10) : ''
+        };
+    });
+}
+
+module.exports = async function(url, includeTranslation) {
+    const pathname = new URL(url).pathname;
+    const slug = pathname.split('/').filter(Boolean).pop().replace(/\.html$/, '');
+    if (!slug) throw new Error('Could not identify the KLZ9 manga');
+
+    const endpoint = `${API_URL}manga/slug/${encodeURIComponent(slug)}`;
+    const res = await fetch(endpoint, { headers: { Accept: 'application/json' } });
+    checkResponse(res, 'Could not load KLZ9 manga details', endpoint);
+    const responseText = await res.text();
+    if (!responseText.trim()) throw new Error('KLZ9 returned empty manga details');
+    const manga = JSON.parse(responseText);
+    if (!manga || !manga.id || !Array.isArray(manga.chapters)) {
+        throw new Error('Unexpected KLZ9 manga details response');
+    }
+
+    const originalDescription = (manga.description || '').trim();
+    let translated = {
+        text: originalDescription,
+        translated: false,
+        error: ''
+    };
+    if (includeTranslation !== false) translated = await translateDescription(manga);
+
+    const authorInfo = [manga.authors, manga.trans_group].filter(value => value).join(' · ');
+    const genres = typeof manga.genres === 'string' ? manga.genres.split(',').map(value => value.trim()) :
+        (Array.isArray(manga.genres) ? manga.genres : []);
+    const status = Number(manga.m_status) === 1 ? '已完結' : '連載中';
+    const list = mapChapters(manga);
+    if (list.length === 0) throw new Error('KLZ9 returned no chapters for this manga');
+
+    return {
+        id: manga.id,
+        title: manga.name || '',
+        subtitle: authorInfo,
+        otherName: manga.other_name || '',
+        status: status,
+        genresText: genres.join('、'),
+        summary: translated.text,
+        originalSummary: originalDescription,
+        aiTranslated: translated.translated,
+        translationWarning: translated.error,
+        picture: manga.cover || '',
         list: list
     };
 };

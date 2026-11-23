@@ -1,27 +1,25 @@
 const checkResponse = require('./http');
-const BASE_URL = 'https://www.mangacopy.com/';
-const PAGE_SIZE = 12;
-const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+const catalog = require('./catalog');
 
 class SearchController extends Controller {
-    load(data) {
+    load() {
         let hints = [];
-        const saved = localStorage['mangacopy_search_hints'];
+        const saved = localStorage['klz9_search_hints'];
         if (saved) {
             const parsed = JSON.parse(saved);
             if (Array.isArray(parsed)) hints = parsed;
         }
-        this.offset = 0;
-        this.total = 0;
+        this.query = '';
+        this.page = 0;
+        this.totalPages = 1;
         this.data = {
             list: [],
             focus: false,
             hints: hints,
-            text: data && data.query ? data.query : '',
+            text: '',
             loading: false,
             hasMore: false
         };
-        if (this.data.text) this.onTextSubmit(this.data.text);
     }
 
     onSearchClicked() {
@@ -32,57 +30,41 @@ class SearchController extends Controller {
         this.data.text = text;
     }
 
-    async fetchResults(offset) {
-        const url = `${BASE_URL}api/kb/web/searchcl/comics?offset=${offset}&platform=2&limit=${PAGE_SIZE}&q=${encodeURIComponent(this.query)}&q_type=`;
+    async fetchPage(page) {
+        const url = catalog.listUrl(page, '', this.query);
         const res = await fetch(url, {
-            headers: {
-                'User-Agent': USER_AGENT,
-                'Accept': 'application/json, text/javascript, */*; q=0.01',
-                'Referer': `${BASE_URL}search?q=${encodeURIComponent(this.query)}`
-            }
+            headers: { Accept: 'application/json' }
         });
-        checkResponse(res, 'MangaCopy search failed', url);
+        checkResponse(res, 'KLZ9 search failed', url);
         const text = await res.text();
-        if (!text.trim()) throw new Error('MangaCopy search returned an empty response');
-        const data = JSON.parse(text);
-        if (data.code !== 200 || !data.results || !Array.isArray(data.results.list)) {
-            throw new Error(data.message || 'Unexpected MangaCopy search response');
-        }
-        this.total = Number(data.results.total) || 0;
-        return data.results.list.map(item => {
-            if (!item || !item.path_word || !item.name || !item.cover) return null;
-            const author = Array.isArray(item.author) ? item.author.map(value => value.name).filter(Boolean).join(', ') : '';
-            return {
-                title: item.name,
-                link: new URL(`/comic/${item.path_word}`, BASE_URL).toString(),
-                picture: new URL(item.cover, BASE_URL).toString(),
-                pictureHeaders: { Referer: BASE_URL },
-                subtitle: author
-            };
-        }).filter(item => item !== null);
+        if (!text.trim()) throw new Error('KLZ9 search returned an empty response');
+        return catalog.parseList(JSON.parse(text));
     }
 
     async onTextSubmit(text) {
-        text = (text || '').trim();
-        if (!text) return;
-        this.query = text;
+        const query = (text || '').trim();
+        if (!query) return;
+        this.query = query;
+        this.page = 0;
         this.setState(() => {
-            this.data.text = text;
+            this.data.text = query;
             this.data.loading = true;
             this.data.focus = false;
-            const index = this.data.hints.indexOf(text);
+            this.data.list = [];
+            const index = this.data.hints.indexOf(query);
             if (index >= 0) this.data.hints.splice(index, 1);
-            this.data.hints.unshift(text);
+            this.data.hints.unshift(query);
             while (this.data.hints.length > 30) this.data.hints.pop();
-            localStorage['mangacopy_search_hints'] = JSON.stringify(this.data.hints);
+            localStorage['klz9_search_hints'] = JSON.stringify(this.data.hints);
         });
         try {
-            const items = await this.fetchResults(0);
-            this.offset = items.length;
+            const result = await this.fetchPage(1);
+            this.page = 1;
+            this.totalPages = result.totalPages;
             this.setState(() => {
-                this.data.list = items;
+                this.data.list = result.items;
+                this.data.hasMore = this.page < this.totalPages;
                 this.data.loading = false;
-                this.data.hasMore = this.offset < this.total;
             });
         } catch (e) {
             showToast(`${e}\n${e.stack}`);
@@ -91,15 +73,16 @@ class SearchController extends Controller {
     }
 
     async onLoadMore() {
-        if (!this.query || !this.data.hasMore) return;
+        if (!this.query || this.data.loading || this.page >= this.totalPages) return;
         this.setState(() => { this.data.loading = true; });
         try {
-            const items = await this.fetchResults(this.offset);
-            this.offset += items.length;
+            const page = this.page + 1;
+            const result = await this.fetchPage(page);
+            this.page = page;
             this.setState(() => {
-                this.data.list.push(...items);
+                this.data.list.push(...result.items);
+                this.data.hasMore = this.page < this.totalPages;
                 this.data.loading = false;
-                this.data.hasMore = this.offset < this.total;
             });
         } catch (e) {
             showToast(`${e}\n${e.stack}`);
@@ -113,9 +96,10 @@ class SearchController extends Controller {
 
     onHintPressed(index) {
         const hint = this.data.hints[index];
-        if (!hint) return;
-        this.findElement('input').blur();
-        this.onTextSubmit(hint);
+        if (hint) {
+            this.findElement('input').blur();
+            this.onTextSubmit(hint);
+        }
     }
 
     onTextFocus() {

@@ -13,38 +13,40 @@ class BookController extends Controller {
                 title: this.data.title,
                 subtitle: this.data.subtitle,
                 picture: this.data.picture,
-                summary: this.data.summary
+                summary: this.data.summary,
+                otherName: this.data.otherName
             }
         };
     }
 
     load(data) {
         this.url = data.link;
-        this.cacheKey = `mangacopy:book:v2:${this.url}`;
+        this.cacheKey = `klz9:book:v1:${this.url}`;
         this.data = {
             title: data.title,
             subtitle: data.subtitle || '',
-            summary: data.summary || '',
             picture: data.picture,
-            pictureHeaders: { Referer: this.url },
+            pictureHeaders: { Referer: 'https://klz9.com/' },
+            summary: null,
+            otherName: null,
+            status: null,
+            genresText: null,
+            aiTranslated: false,
+            translationWarning: null,
             loading: false,
             editing: false,
-            reverse: localStorage['mangacopy_reverse'] !== 'false',
+            reverse: localStorage['klz9_reverse'] !== 'false',
             list: [],
             last: null
         };
         this.selected = [];
         this.addHistory(this.bookInfo);
 
-        const cached = this.readCachedBook();
+        const cached = localStorage[this.cacheKey];
         if (cached) {
-            if (Array.isArray(cached.list)) {
-                this.data.title = cached.title || this.data.title;
-                this.data.subtitle = cached.subtitle || this.data.subtitle;
-                this.data.summary = cached.summary || this.data.summary;
-                this.data.list = cached.list;
-            }
-            if (!cached.time || new Date().getTime() - cached.time > 30 * 60 * 1000) {
+            const value = JSON.parse(cached);
+            this.applyBookData(value);
+            if (!value.time || new Date().getTime() - value.time > 30 * 60 * 1000) {
                 this.reload();
             }
         } else {
@@ -54,50 +56,28 @@ class BookController extends Controller {
         FavoritesManager.clearNew(this.url);
     }
 
-    readCachedBook() {
-        let cached = localStorage[this.cacheKey];
-        if (cached) return JSON.parse(cached);
-
-        cached = localStorage[`book:${this.url}`];
-        if (!cached) return null;
-        const value = JSON.parse(cached);
-        const list = [];
-        const seen = Object.create(null);
-        for (const group of value.groups || []) {
-            const categories = Array.isArray(group.categories) ? group.categories : [];
-            let allCategory;
-            for (const category of categories) {
-                if (category.name === '全部') {
-                    allCategory = category;
-                    break;
-                }
-            }
-            if (!allCategory && categories.length) allCategory = categories[0];
-            for (const item of (allCategory && Array.isArray(allCategory.list) ? allCategory.list : [])) {
-                if (!item.link || seen[item.link]) continue;
-                seen[item.link] = true;
-                const chapter = { title: item.title, link: item.link };
-                if (item.subtitle) chapter.subtitle = item.subtitle;
-                list.push(chapter);
-            }
-        }
-        if (list.length) value.list = list;
-        localStorage[this.cacheKey] = JSON.stringify(value);
-        return value;
+    applyBookData(value) {
+        this.data.title = value.title || this.data.title;
+        this.data.subtitle = value.subtitle || this.data.subtitle;
+        this.data.picture = value.picture || this.data.picture;
+        this.data.summary = value.summary || null;
+        this.data.otherName = value.otherName || null;
+        this.data.status = value.status || null;
+        this.data.genresText = value.genresText || null;
+        this.data.aiTranslated = value.aiTranslated === true;
+        this.data.translationWarning = value.translationWarning || null;
+        this.data.list = Array.isArray(value.list) ? value.list : [];
+        this.data.last = this.getLast();
     }
 
     async reload() {
         this.setState(() => { this.data.loading = true; });
         try {
-            const value = await bookFetch(this.url);
+            const value = await bookFetch(this.url, true);
             value.time = new Date().getTime();
             localStorage[this.cacheKey] = JSON.stringify(value);
             this.setState(() => {
-                this.data.title = value.title || this.data.title;
-                this.data.subtitle = value.subtitle || this.data.subtitle;
-                this.data.summary = value.summary || this.data.summary;
-                this.data.list = value.list;
-                this.data.last = this.getLast();
+                this.applyBookData(value);
                 this.data.loading = false;
             });
         } catch (e) {
@@ -120,7 +100,7 @@ class BookController extends Controller {
                 FavoritesManager.remove(this.url);
             } else {
                 let last;
-                if (this.data.list.length > 0) {
+                if (this.data.list.length) {
                     const item = this.data.list[this.data.list.length - 1];
                     last = { title: item.title, key: item.link };
                 }
@@ -210,7 +190,7 @@ class BookController extends Controller {
         const reverse = value === true || value === 'true';
         this.setState(() => {
             this.data.reverse = reverse;
-            localStorage['mangacopy_reverse'] = reverse.toString();
+            localStorage['klz9_reverse'] = reverse.toString();
         });
     }
 }
