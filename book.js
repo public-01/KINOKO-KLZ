@@ -23,7 +23,7 @@ class BookController extends Controller {
 
     load(data) {
         this.url = data.link;
-        this.cacheKey = `klz9:book:v3:${this.url}`;
+        this.cacheKey = `klz9:book:v4:${this.url}`;
         this.data = {
             title: data.title,
             originalTitle: data.originalTitle || null,

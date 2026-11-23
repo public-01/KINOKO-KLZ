@@ -10,12 +10,16 @@ function listUrl(page, genre, search) {
 }
 
 function getDisplayTitle(item) {
+    const isPlaceholder = value =>
+        ['undefined', 'null', 'none', 'n/a', 'unknown', '未定義', '不明', '未知']
+            .indexOf(value.toLowerCase()) >= 0;
     const aliases = typeof item.other_name === 'string' ?
-        item.other_name.split(/,\s+/).map(value => value.trim()).filter(Boolean) : [];
+        item.other_name.split(/,\s+/).map(value => value.trim())
+            .filter(value => value && !isPlaceholder(value)) : [];
     const names = aliases.concat([item.name, item.title])
         .filter(value => typeof value === 'string')
         .map(value => value.trim())
-        .filter(Boolean);
+        .filter(value => value && !isPlaceholder(value));
     const hasHan = value => /[\u3400-\u9fff]/.test(value);
     const hasKana = value => /[\u3040-\u30ff]/.test(value);
     const countHan = value => (value.match(/[\u3400-\u9fff]/g) || []).length;
@@ -25,7 +29,8 @@ function getDisplayTitle(item) {
 
     return chinese ||
         japanese ||
-        item.name || item.title;
+        names.find(value => hasHan(value)) ||
+        names[0] || '';
 }
 
 function mapManga(item) {
