@@ -14,15 +14,21 @@ function getDisplayTitle(item) {
         ['undefined', 'null', 'none', 'n/a', 'unknown', '未定義', '不明', '未知']
             .indexOf(value.toLowerCase()) >= 0;
     const aliases = typeof item.other_name === 'string' ?
-        item.other_name.split(/,\s+/).map(value => value.trim())
+        item.other_name.split(/,\s*/).map(value => value.trim())
             .filter(value => value && !isPlaceholder(value)) : [];
     const mixedLanguage = /[A-Za-z\u0400-\u04ff\u0600-\u06ff\u0900-\u097f\u0e00-\u0eff\uac00-\ud7af]/;
+    const cjk = /[\u3000-\u30ff\u3400-\u9fff\uff00-\uffef]/;
+    const hasKana = value => /[\u3040-\u30ff]/.test(value);
     const expandName = value => {
         if (typeof value !== 'string' || !value.trim() || isPlaceholder(value.trim())) return [];
         const name = value.trim();
-        const parts = name.match(/[\u3000-\u30ff\u3400-\u9fff\uff00-\uffef]+/g) || [];
-        return (mixedLanguage.test(name) ? parts : [name])
-            .filter(part => part && !isPlaceholder(part));
+        const cjkParts = name.split(/\s+/).filter(part => cjk.test(part));
+        if (cjkParts.length > 1 || (cjkParts.length === 1 && cjkParts[0] !== name)) {
+            return cjkParts.reduce((all, part) => all.concat(expandName(part)), []);
+        }
+        if (hasKana(name) || !mixedLanguage.test(name)) return [name];
+        return (name.match(/[\u3000-\u30ff\u3400-\u9fff\uff00-\uffef]+/g) || [])
+            .filter(part => !isPlaceholder(part));
     };
     const candidates = aliases.reduce((all, alias) => all.concat(expandName(alias)), []);
     const translatedNames = Array.isArray(item.translated_name) ? item.translated_name :
@@ -33,7 +39,6 @@ function getDisplayTitle(item) {
         typeof name === 'string' && name.trim().toLowerCase() === value.toLowerCase()) ||
         translatedCandidates.some(name => name.toLowerCase() === value.toLowerCase());
     const hasHan = value => /[\u3400-\u9fff]/.test(value);
-    const hasKana = value => /[\u3040-\u30ff]/.test(value);
     const countHan = value => (value.match(/[\u3400-\u9fff]/g) || []).length;
     const japanese = candidates.find(value => hasKana(value)) ||
         candidates.find(value => hasHan(value));
