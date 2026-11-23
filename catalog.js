@@ -10,22 +10,21 @@ function listUrl(page, genre, search) {
 }
 
 function getDisplayTitle(item) {
-    const aliases = typeof item.other_name === 'string' ? item.other_name.split(/[,，]/) : [];
+    const aliases = typeof item.other_name === 'string' ?
+        item.other_name.split(/,\s+/).map(value => value.trim()).filter(Boolean) : [];
     const names = aliases.concat([item.name, item.title])
         .filter(value => typeof value === 'string')
         .map(value => value.trim())
         .filter(Boolean);
     const hasHan = value => /[\u3400-\u9fff]/.test(value);
     const hasKana = value => /[\u3040-\u30ff]/.test(value);
-    const japanese = names.find(value => hasKana(value));
-    const chinese = japanese && aliases.find(value => {
-        const alias = value.trim();
-        return alias && alias !== japanese && hasHan(alias) && !hasKana(alias);
-    });
+    const countHan = value => (value.match(/[\u3400-\u9fff]/g) || []).length;
+    const chinese = aliases.find(value => countHan(value) > 1 && !hasKana(value));
+    const japanese = names.find(value => hasKana(value)) ||
+        aliases.find(value => hasHan(value));
 
     return chinese ||
         japanese ||
-        names.find(value => hasHan(value)) ||
         item.name || item.title;
 }
 
@@ -60,5 +59,6 @@ module.exports = {
     BASE_URL: BASE_URL,
     PAGE_SIZE: PAGE_SIZE,
     listUrl: listUrl,
+    getDisplayTitle: getDisplayTitle,
     parseList: parseList
 };

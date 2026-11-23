@@ -1,5 +1,6 @@
 const checkResponse = require('./http');
 const sha256 = require('./sha256');
+const catalog = require('./catalog');
 
 const BASE_URL = 'https://klz9.com/';
 const API_URL = `${BASE_URL}api/`;
@@ -29,11 +30,8 @@ function getUsage() {
 }
 
 async function translateDescription(manga) {
-    const originalTitle = manga.name || '';
     const description = (manga.description || '').trim();
     const untranslated = error => ({
-        title: originalTitle,
-        titleTranslated: false,
         text: description,
         translated: false,
         error: error || ''
@@ -48,10 +46,7 @@ async function translateDescription(manga) {
         try {
             const translation = JSON.parse(cached);
             if (translation && translation.text) {
-                const title = typeof translation.title === 'string' ? translation.title.trim() : '';
                 return {
-                    title: title || originalTitle,
-                    titleTranslated: !!title && title !== originalTitle,
                     text: translation.text,
                     translated: true,
                     error: ''
@@ -92,15 +87,10 @@ async function translateDescription(manga) {
         if (!result.translatedDescription) {
             throw new Error('KLZ9 未提供翻譯後的作品說明');
         }
-        const translatedTitle = typeof result.translatedTitle === 'string' ?
-            result.translatedTitle.trim() : '';
         localStorage[cacheKey] = JSON.stringify({
-            text: result.translatedDescription,
-            title: translatedTitle
+            text: result.translatedDescription
         });
         return {
-            title: translatedTitle || originalTitle,
-            titleTranslated: !!translatedTitle && translatedTitle !== originalTitle,
             text: result.translatedDescription,
             translated: true,
             error: ''
@@ -141,8 +131,6 @@ module.exports = async function(url, includeTranslation) {
 
     const originalDescription = (manga.description || '').trim();
     let translated = {
-        title: manga.name || '',
-        titleTranslated: false,
         text: originalDescription,
         translated: false,
         error: ''
@@ -155,11 +143,13 @@ module.exports = async function(url, includeTranslation) {
     const status = Number(manga.m_status) === 1 ? '已完結' : '連載中';
     const list = mapChapters(manga);
     if (list.length === 0) throw new Error('KLZ9 returned no chapters for this manga');
+    const displayTitle = catalog.getDisplayTitle(manga);
+    const originalTitle = displayTitle !== manga.name ? manga.name || '' : '';
 
     return {
         id: manga.id,
-        title: translated.title || manga.name || '',
-        originalTitle: translated.titleTranslated ? manga.name || '' : '',
+        title: displayTitle || manga.name || '',
+        originalTitle: originalTitle,
         subtitle: authorInfo,
         otherName: manga.other_name || '',
         status: status,
