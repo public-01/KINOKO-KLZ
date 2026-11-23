@@ -80,14 +80,8 @@
                         <view color="color(canvas)" height="48" padding="ltrb(10,0,10,0)">
                             <row>
                                 <icon color="color(primary)">bookmark</icon>
-                                <text>章節 ${length($list)}</text>
-                                <expanded>
-                                    <if candidate="isNotNull($last)">
-                                        <button type="text" onPressed="onLastPressed">
-                                            <text text="str(&quot;[&quot;,${last},&quot;]&quot;)"/>
-                                        </button>
-                                    </if>
-                                </expanded>
+                                <text text="loc(chapters)"/>
+                                <expanded><view/></expanded>
                                 <menu-button onSelected="onOrderSelected">
                                     <attr:icon><icon color="color(primary)">sort</icon></attr:icon>
                                     <attr:items>
