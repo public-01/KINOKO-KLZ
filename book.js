@@ -153,7 +153,7 @@ class BookController extends Controller {
         if (!key) return;
         let index = -1;
         for (let i = 0; i < this.data.list.length; i++) {
-            if (this.data.list[i].link === key) {
+            if (this.matchesLastChapter(this.data.list[i], key)) {
                 index = i;
                 break;
             }
@@ -179,7 +179,7 @@ class BookController extends Controller {
         const key = this.getLastChapterKey();
         if (!key) return null;
         for (const item of this.data.list) {
-            if (item.link === key) {
+            if (this.matchesLastChapter(item, key)) {
                 const title = typeof item.title === 'string' ? item.title :
                     (item.title && typeof item.title.title === 'string' ? item.title.title : '');
                 if (!title) return null;
@@ -187,6 +187,11 @@ class BookController extends Controller {
             }
         }
         return null;
+    }
+
+    matchesLastChapter(item, key) {
+        return item.link === key ||
+            (item.id !== undefined && item.id !== null && `${item.link}:${item.id}` === key);
     }
 
     getLastChapterKey() {
