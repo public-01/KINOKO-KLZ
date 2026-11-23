@@ -19,8 +19,14 @@ function getDisplayTitle(item) {
     const mixedLanguage = /[A-Za-z\u0400-\u04ff\u0600-\u06ff\u0900-\u097f\u0e00-\u0eff\uac00-\ud7af]/;
     const cjk = /[\u3000-\u30ff\u3400-\u9fff\uff00-\uffef]/;
     const hasKana = value => /[\u3040-\u30ff]/.test(value);
+    const isFormatAnnotation = value => {
+        const match = value.match(/^[（(]\s*(.+?)\s*[）)]$/);
+        return match && ['小説', '小说', '小說', '漫画', '漫畫', 'コミック', 'manga', 'novel', 'comic', 'raw']
+            .indexOf(match[1].trim().toLowerCase()) >= 0;
+    };
     const expandName = value => {
-        if (typeof value !== 'string' || !value.trim() || isPlaceholder(value.trim())) return [];
+        if (typeof value !== 'string' || !value.trim() || isPlaceholder(value.trim()) ||
+            isFormatAnnotation(value.trim())) return [];
         const name = value.trim();
         const cjkParts = name.split(/\s+/).filter(part => cjk.test(part));
         if (cjkParts.length > 1 || (cjkParts.length === 1 && cjkParts[0] !== name)) {
@@ -28,9 +34,10 @@ function getDisplayTitle(item) {
         }
         if (hasKana(name) || !mixedLanguage.test(name)) return [name];
         return (name.match(/[\u3000-\u30ff\u3400-\u9fff\uff00-\uffef]+/g) || [])
-            .filter(part => !isPlaceholder(part));
+            .filter(part => !isPlaceholder(part) && !isFormatAnnotation(part));
     };
-    const candidates = aliases.reduce((all, alias) => all.concat(expandName(alias)), []);
+    const aliasCandidates = aliases.map(alias => expandName(alias));
+    const candidates = aliasCandidates.reduce((all, parts) => all.concat(parts), []);
     const translatedNames = Array.isArray(item.translated_name) ? item.translated_name :
         (typeof item.translated_name === 'string' ? [item.translated_name] : []);
     const translatedCandidates = translatedNames.reduce((all, name) =>
