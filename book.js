@@ -77,7 +77,7 @@ class BookController extends Controller {
     async reload() {
         this.setState(() => { this.data.loading = true; });
         try {
-            const value = await bookFetch(this.url, true);
+            const value = await bookFetch(this.url, false);
             value.time = new Date().getTime();
             localStorage[this.cacheKey] = JSON.stringify(value);
             this.setState(() => {

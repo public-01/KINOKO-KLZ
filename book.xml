@@ -49,26 +49,6 @@
                             <span><view padding="ltrb(0,4,0,0)"/></span>
                             <span size="8">狀態：$status</span>
                         </if>
-                        <if candidate="isNotNull($genresText)">
-                            <span><view padding="ltrb(0,4,0,0)"/></span>
-                            <span size="8">類型：$genresText</span>
-                        </if>
-                        <if candidate="isNotNull($summary)">
-                            <span><view padding="ltrb(0,5,0,0)"/></span>
-                            <span size="9">
-                                <if candidate="$aiTranslated">
-                                    <span color="hex(#FFE082)">AI 翻譯：</span>
-                                </if>
-                                <else>
-                                    <span color="hex(#FFE082)">作品說明：</span>
-                                </else>
-                                <span color="hex(#FFFFFF)">$summary</span>
-                            </span>
-                        </if>
-                        <if candidate="isNotNull($translationWarning)">
-                            <span><view padding="ltrb(0,4,0,0)"/></span>
-                            <span size="7">AI 翻譯未取得，暫時顯示原文：$translationWarning</span>
-                        </if>
                     </text>
                 </FlexibleSpaceBar>
                 <attr:actions>
