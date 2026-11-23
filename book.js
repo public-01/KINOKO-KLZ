@@ -5,12 +5,14 @@ class BookController extends Controller {
         return {
             key: this.url,
             title: this.data.title,
+            originalTitle: this.data.originalTitle,
             subtitle: this.data.subtitle,
             picture: this.data.picture,
             page: 'book',
             data: {
                 link: this.url,
                 title: this.data.title,
+                originalTitle: this.data.originalTitle,
                 subtitle: this.data.subtitle,
                 picture: this.data.picture,
                 summary: this.data.summary,
@@ -21,9 +23,10 @@ class BookController extends Controller {
 
     load(data) {
         this.url = data.link;
-        this.cacheKey = `klz9:book:v1:${this.url}`;
+        this.cacheKey = `klz9:book:v2:${this.url}`;
         this.data = {
             title: data.title,
+            originalTitle: data.originalTitle || null,
             subtitle: data.subtitle || '',
             picture: data.picture,
             pictureHeaders: { Referer: 'https://klz9.com/' },
@@ -58,6 +61,7 @@ class BookController extends Controller {
 
     applyBookData(value) {
         this.data.title = value.title || this.data.title;
+        this.data.originalTitle = value.originalTitle || null;
         this.data.subtitle = value.subtitle || this.data.subtitle;
         this.data.picture = value.picture || this.data.picture;
         this.data.summary = value.summary || null;

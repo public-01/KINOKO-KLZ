@@ -29,9 +29,17 @@ function getUsage() {
 }
 
 async function translateDescription(manga) {
+    const originalTitle = manga.name || '';
     const description = (manga.description || '').trim();
+    const untranslated = error => ({
+        title: originalTitle,
+        titleTranslated: false,
+        text: description,
+        translated: false,
+        error: error || ''
+    });
     if (!description || description.toLowerCase() === 'updating') {
-        return { text: description, translated: false, error: '' };
+        return untranslated('');
     }
 
     const cacheKey = `${TRANSLATION_CACHE_PREFIX}${manga.id}:${TARGET_LANGUAGE}`;
@@ -40,10 +48,17 @@ async function translateDescription(manga) {
         try {
             const translation = JSON.parse(cached);
             if (translation && translation.text) {
-                return { text: translation.text, translated: true, error: '' };
+                const title = typeof translation.title === 'string' ? translation.title.trim() : '';
+                return {
+                    title: title || originalTitle,
+                    titleTranslated: !!title && title !== originalTitle,
+                    text: translation.text,
+                    translated: true,
+                    error: ''
+                };
             }
         } catch (e) {
-            return { text: description, translated: false, error: `AI 翻譯快取讀取失敗：${e}` };
+            return untranslated(`AI 翻譯快取讀取失敗：${e}`);
         }
     }
 
@@ -51,14 +66,10 @@ async function translateDescription(manga) {
     try {
         usage = getUsage();
     } catch (e) {
-        return { text: description, translated: false, error: `AI 翻譯額度讀取失敗：${e}` };
+        return untranslated(`AI 翻譯額度讀取失敗：${e}`);
     }
     if (usage.count >= DAILY_TRANSLATION_LIMIT) {
-        return {
-            text: description,
-            translated: false,
-            error: '今日 AI 翻譯額度已用完，暫時顯示原文。'
-        };
+        return untranslated('今日 AI 翻譯額度已用完，暫時顯示原文。');
     }
     usage.count++;
     localStorage[TRANSLATION_USAGE_KEY] = JSON.stringify(usage);
@@ -81,13 +92,21 @@ async function translateDescription(manga) {
         if (!result.translatedDescription) {
             throw new Error('KLZ9 未提供翻譯後的作品說明');
         }
+        const translatedTitle = typeof result.translatedTitle === 'string' ?
+            result.translatedTitle.trim() : '';
         localStorage[cacheKey] = JSON.stringify({
             text: result.translatedDescription,
-            title: result.translatedTitle || ''
+            title: translatedTitle
         });
-        return { text: result.translatedDescription, translated: true, error: '' };
+        return {
+            title: translatedTitle || originalTitle,
+            titleTranslated: !!translatedTitle && translatedTitle !== originalTitle,
+            text: result.translatedDescription,
+            translated: true,
+            error: ''
+        };
     } catch (e) {
-        return { text: description, translated: false, error: `${e}` };
+        return untranslated(`${e}`);
     }
 }
 
@@ -122,6 +141,8 @@ module.exports = async function(url, includeTranslation) {
 
     const originalDescription = (manga.description || '').trim();
     let translated = {
+        title: manga.name || '',
+        titleTranslated: false,
         text: originalDescription,
         translated: false,
         error: ''
@@ -137,7 +158,8 @@ module.exports = async function(url, includeTranslation) {
 
     return {
         id: manga.id,
-        title: manga.name || '',
+        title: translated.title || manga.name || '',
+        originalTitle: translated.titleTranslated ? manga.name || '' : '',
         subtitle: authorInfo,
         otherName: manga.other_name || '',
         status: status,

@@ -33,6 +33,10 @@
                                 <text size="6" text="loc(source)"/>
                             </button>
                         </span>
+                        <if candidate="isNotNull($originalTitle)">
+                            <span><view padding="ltrb(0,4,0,0)"/></span>
+                            <span size="8">原名：$originalTitle</span>
+                        </if>
                         <if candidate="isNotNull($subtitle)">
                             <span><view padding="ltrb(0,5,0,0)"/></span>
                             <span size="8">$subtitle</span>
