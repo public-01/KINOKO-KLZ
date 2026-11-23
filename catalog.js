@@ -28,11 +28,14 @@ function getDisplayTitle(item) {
         if (typeof value !== 'string' || !value.trim() || isPlaceholder(value.trim()) ||
             isFormatAnnotation(value.trim())) return [];
         const name = value.trim();
-        const cjkParts = name.split(/\s+/).filter(part => cjk.test(part));
-        if (cjkParts.length > 1 || (cjkParts.length === 1 && cjkParts[0] !== name)) {
+        const words = name.split(/\s+/);
+        const cjkParts = words.filter(part => cjk.test(part));
+        const otherParts = words.filter(part => !cjk.test(part));
+        const multilingualList = otherParts.length >= 5 && otherParts.length > cjkParts.length;
+        if (!multilingualList && (otherParts.length === 0 || hasKana(name))) return [name];
+        if (cjkParts.length > 0) {
             return cjkParts.reduce((all, part) => all.concat(expandName(part)), []);
         }
-        if (hasKana(name) || !mixedLanguage.test(name)) return [name];
         return (name.match(/[\u3000-\u30ff\u3400-\u9fff\uff00-\uffef]+/g) || [])
             .filter(part => !isPlaceholder(part) && !isFormatAnnotation(part));
     };
