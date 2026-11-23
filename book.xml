@@ -1,7 +1,7 @@
 <scaffold>
     <refresh onRefresh="onRefresh" loading="$loading">
         <slivers>
-            <sliver-appbar expandedHeight="300" color="white" floating="true" pinned="true">
+            <sliver-appbar expandedHeight="340" color="white" floating="true" pinned="true">
                 <FlexibleSpaceBar padding="ltrb(20,0,0,64)">
                     <attr:background>
                         <stack>
@@ -13,16 +13,16 @@
                                 <attr:gradient>
                                     <LinearGradient begin="topCenter" end="bottomCenter">
                                         <attr:colors>
-                                            <color>hex(#0007)</color>
-                                            <color>hex(#0000)</color>
-                                            <color>hex(#0007)</color>
+                                            <color>hex(#0009)</color>
+                                            <color>hex(#0009)</color>
+                                            <color>hex(#0009)</color>
                                         </attr:colors>
                                     </LinearGradient>
                                 </attr:gradient>
                             </view>
                         </stack>
                     </attr:background>
-                    <text lines="12" overflow="ellipsis">
+                    <text lines="16" overflow="ellipsis">
                         <span size="14">$title</span>
                         <span alignment="middle">
                             <button type="text"
@@ -55,14 +55,14 @@
                         </if>
                         <if candidate="isNotNull($summary)">
                             <span><view padding="ltrb(0,5,0,0)"/></span>
-                            <span size="8">
+                            <span size="9">
                                 <if candidate="$aiTranslated">
-                                    <span>AI 翻譯：</span>
+                                    <span color="hex(#FFE082)">AI 翻譯：</span>
                                 </if>
                                 <else>
-                                    <span>作品說明：</span>
+                                    <span color="hex(#FFE082)">作品說明：</span>
                                 </else>
-                                <span>$summary</span>
+                                <span color="hex(#FFFFFF)">$summary</span>
                             </span>
                         </if>
                         <if candidate="isNotNull($translationWarning)">
