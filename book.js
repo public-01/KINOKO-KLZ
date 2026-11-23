@@ -149,7 +149,7 @@ class BookController extends Controller {
     }
 
     async onLastPressed() {
-        const key = this.getLastKey(this.url);
+        const key = this.getLastChapterKey();
         if (!key) return;
         let index = -1;
         for (let i = 0; i < this.data.list.length; i++) {
@@ -176,12 +176,25 @@ class BookController extends Controller {
     }
 
     getLast() {
-        const key = this.getLastKey(this.url);
+        const key = this.getLastChapterKey();
         if (!key) return null;
         for (const item of this.data.list) {
             if (item.link === key) {
-                return item.title.length > 18 ? `...${item.title.substr(-16)}` : item.title;
+                const title = typeof item.title === 'string' ? item.title :
+                    (item.title && typeof item.title.title === 'string' ? item.title.title : '');
+                if (!title) return null;
+                return title.length > 18 ? `...${title.substr(-16)}` : title;
             }
+        }
+        return null;
+    }
+
+    getLastChapterKey() {
+        const last = this.getLastKey(this.url);
+        if (typeof last === 'string') return last;
+        if (last && typeof last === 'object') {
+            if (typeof last.key === 'string') return last.key;
+            if (typeof last.link === 'string') return last.link;
         }
         return null;
     }
